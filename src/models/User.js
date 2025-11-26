@@ -18,7 +18,7 @@ const userSchema = new mongoose.Schema({
       "cashier",
       "stockController"
     ],
-    default: "User",
+    default: "cashier",
   },
   active: {type: Boolean, default: true},
   createdAt: {

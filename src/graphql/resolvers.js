@@ -1,8 +1,15 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import mongoose from "mongoose";
+import { GraphQLError } from "graphql";
 
+import StockMovement from "../models/StockMovement.js";
 import paginateQuery from "../utils/paginateQuery.js";
+import SubProduct from "../models/SubProduct.js";
+import Category from "../models/Category.js";
+import Product from "../models/Product.js";
 import { errorResponse, successResponse } from "../utils/response.js";
+import Shop from "../models/Shop.js";
 import Unit from "../models/Unit.js";
 import User from "../models/User.js";
 const requireAuth = (user) => {
@@ -30,7 +37,7 @@ export const resolvers = {
     users: () => User.find(),
     getUsersWithPagination: async (
       _,
-      { page = 1, limit = 5, pagination = true, keyword = "" }
+      { page = 1, limit = 5, pagination = true, keyword = "", role = "" }
     ) => {
       try {
         const query = {
@@ -41,6 +48,9 @@ export const resolvers = {
             ],
           }),
         };
+        if (role) {
+          query.role = role;
+        }
 
         const paginationQuery = await paginateQuery({
           model: User,
@@ -58,15 +68,29 @@ export const resolvers = {
         console.log("Error", error);
       }
     },
+
     // unit
+    getUnit: async (_, { user }) => {
+      try {
+        const units = await Unit.find();
+        return units;
+      } catch (error) {
+        console.log("Error", error);
+        return [];
+      }
+    },
     getUnitWithPagination: async (
       _,
-      { page = 1, limit = 5, pagination = true, keyword = "" }
+      { page = 1, limit = 5, pagination = true, keyword = "" },
+      { user }
     ) => {
       try {
         const query = {
           ...(keyword && {
-            $or: [{ nameEn: { $regex: keyword, $options: "i" } }],
+            $or: [
+              { nameEn: { $regex: keyword, $options: "i" } },
+              { nameKh: { $regex: keyword, $options: "i" } },
+            ],
           }),
         };
 
@@ -84,6 +108,133 @@ export const resolvers = {
         };
       } catch (error) {
         console.log("Error", error);
+      }
+    },
+
+    // category
+    getCategory: async (_, { user }) => {
+      try {
+        const category = await Category.find();
+        return category;
+      } catch (error) {
+        console.log("Error", error);
+        return [];
+      }
+    },
+
+    getCategoryWithPagination: async (
+      _,
+      { page = 1, limit = 5, pagination = true, keyword = "" }
+    ) => {
+      try {
+        const query = {
+          ...(keyword && {
+            $or: [
+              { nameEn: { $regex: keyword, $options: "i" } },
+              { nameKh: { $regex: keyword, $options: "i" } },
+            ],
+          }),
+        };
+
+        const paginationQuery = await paginateQuery({
+          model: Category,
+          query,
+          page,
+          limit,
+          pagination,
+        });
+
+        return {
+          data: paginationQuery?.data,
+          paginator: paginationQuery?.paginator,
+        };
+      } catch (error) {
+        console.log("Error", error);
+      }
+    },
+    //shop
+
+    getAllShops: async (_, { _id }) => {
+      const shops = await Shop.find({ user: _id })
+        .populate({
+          path: "user",
+          select: "nameEn nameKh email role",
+        })
+        .exec();
+
+      shops.forEach((shop) => {
+        shop.user = shop.user.filter((u) => u !== null);
+      });
+
+      return shops;
+    },
+    getShopByShopId: async (_, { _id, shopId }) => {
+      try {
+        const shop = await Shop.findOne({
+          _id: shopId,
+          user: { $in: [_id] },
+        })
+          .populate({
+            path: "user",
+            select: "nameEn nameKh email role",
+          })
+          .exec();
+
+        if (!shop) {
+          return null;
+        }
+
+        shop.user = shop.user.filter((u) => u !== null);
+
+        return shop;
+      } catch (error) {
+        console.error(error);
+        throw new Error("Failed to get shop");
+      }
+    },
+    getProductsWithPagination: async (
+      _,
+      { page = 1, limit = 5, pagination = true, keyword = "" }
+    ) => {
+      try {
+        const query = {
+          ...(keyword && {
+            $or: [
+              { nameEn: { $regex: keyword, $options: "i" } },
+              { nameKh: { $regex: keyword, $options: "i" } },
+            ],
+          }),
+        };
+
+        const paginationQuery = await paginateQuery({
+          model: Product,
+          query,
+          page,
+          limit,
+          pagination,
+          populate: ["categoryId", ["unitId"]],
+        });
+        return {
+          data: paginationQuery?.data,
+          paginator: paginationQuery?.paginator,
+        };
+      } catch (error) {
+        console.log("Errro", error);
+      }
+    },
+    getSubProducts: async (_, { parentProductId }) => {
+      try {
+        if (!parentProductId) return [];
+        const subProducts = await SubProduct.find({ parentProductId })
+          .sort({ createdAt: -1 })
+          .populate("unitId")
+          .populate("shopId")
+          .populate("parentProductId");
+
+        return subProducts;
+      } catch (error) {
+        console.error("getSubProducts error:", error);
+        return [];
       }
     },
   },
@@ -199,7 +350,7 @@ export const resolvers = {
 
       const token = jwt.sign(
         { userId: user.id },
-        process.env.JWT_SECRET || "Ni0sddfsd325sfweewfer432sdfg_0089",
+        process.env.JWT_SECRET || "Ni0sddfsd325sfweewfer432sdfg_0089@IT",
         {
           expiresIn: "24h",
         }
@@ -211,9 +362,22 @@ export const resolvers = {
       };
     },
 
-    createUnit: async (_, { input }) => {
-      // requireRole(user,["Admin"])
+    createUnit: async (_, { input }, { user }) => {
+      requireRole(user, ["admin", "superAdmin"]);
+
       try {
+        const existingUnit = await Unit.findOne({
+          $or: [{ nameKh: input.nameEn }, { nameEn: input.nameEn }],
+        });
+        if (existingUnit) {
+          return {
+            isSuccess: false,
+            message: {
+              messageEn: "Exist Unit",
+              messageKh: "មានរួចហើយ",
+            },
+          };
+        }
         const unit = new Unit(input);
         const unitSave = await unit.save();
         return {
@@ -221,6 +385,495 @@ export const resolvers = {
           unitSave,
         };
       } catch (error) {
+        return errorResponse();
+      }
+    },
+    updateUnit: async (_, { _id, input }) => {
+      try {
+        const existingUnit = await Unit.findById(_id);
+        if (!existingUnit) {
+          return {
+            isSuccess: false,
+            message: {
+              messageEn: "Unit not found",
+              messageKh: "មិនមានឯកតា",
+            },
+          };
+        }
+
+        await Unit.findByIdAndUpdate(_id, input, { new: true });
+
+        return successResponse();
+      } catch (error) {
+        return errorResponse();
+      }
+    },
+    updateUnitStatus: async (_, { _id, active }) => {
+      try {
+        const existingUnit = await Unit.findById(_id);
+        if (!existingUnit) {
+          return {
+            isSuccess: false,
+            message: {
+              messageEn: "Unit not found",
+              messageKh: "មិនមានឯកតា",
+            },
+          };
+        }
+
+        await Unit.findByIdAndUpdate(_id, { active }, { new: true });
+        return successResponse();
+      } catch (error) {
+        return errorResponse();
+      }
+    },
+    deleteUnit: async (_, { _id }) => {
+      try {
+        const existingUnit = await Unit.findById(_id);
+        if (!existingUnit) {
+          return {
+            isSuccess: false,
+            message: {
+              messageEn: "Unit not found",
+              messageKh: "មិនមានឯកតា",
+            },
+          };
+        }
+
+        await Unit.findByIdAndDelete(_id);
+
+        return successResponse();
+      } catch (error) {
+        return errorResponse();
+      }
+    },
+
+    // category
+    createCategory: async (_, { input }) => {
+      // requireRole(user,["Admin"])
+      try {
+        const category = new Category(input);
+        const categorySave = await category.save();
+        return {
+          ...successResponse(),
+          categorySave,
+        };
+      } catch (error) {
+        return errorResponse();
+      }
+    },
+    updateCategory: async (_, { _id, input }) => {
+      try {
+        const existingCategory = await Category.findById(_id);
+        if (!existingCategory) {
+          return {
+            isSuccess: false,
+            message: {
+              messageEn: "Category not found",
+              messageKh: "មិនមានប្រភេទ",
+            },
+          };
+        }
+
+        await Category.findByIdAndUpdate(_id, input, { new: true });
+
+        return successResponse();
+      } catch (error) {
+        return errorResponse();
+      }
+    },
+    updateCategoryStatus: async (_, { _id, active }) => {
+      try {
+        const existingCategory = await Category.findById(_id);
+        if (!existingCategory) {
+          return {
+            isSuccess: false,
+            message: {
+              messageEn: "Category not found",
+              messageKh: "មិនមានប្រភេទ",
+            },
+          };
+        }
+
+        await Category.findByIdAndUpdate(_id, { active }, { new: true });
+        return successResponse();
+      } catch (error) {
+        return errorResponse();
+      }
+    },
+    deleteCategory: async (_, { _id }) => {
+      try {
+        const existingCategory = await Category.findById(_id);
+        if (!existingCategory) {
+          return {
+            isSuccess: false,
+            message: {
+              messageEn: "Category not found",
+              messageKh: "មិនមានប្រភេទ",
+            },
+          };
+        }
+
+        await Category.findByIdAndDelete(_id);
+        return successResponse();
+      } catch (error) {
+        return errorResponse();
+      }
+    },
+    //shop
+    createShop: async (_, { input }, { user }) => {
+      requireRole(user, ["admin", "superAdmin"]);
+      try {
+        const existingShop = await Shop.findOne({ nameEn: input.nameEn });
+        if (existingShop) {
+          return {
+            isSuccess: false,
+            message: {
+              messageEn: "Shop already exists",
+              messageKh: "ហាងមានរួចហើយ",
+            },
+          };
+        }
+
+        const shop = new Shop({
+          ...input,
+          user: [user._id],
+        });
+
+        const shopSave = await shop.save();
+
+        return {
+          ...successResponse(),
+          shop: shopSave,
+        };
+      } catch (error) {
+        console.error(error);
+        return errorResponse();
+      }
+    },
+    addUserControllShop: async (_, { _id, userId }, { user }) => {
+      requireRole(user, ["superAdmin", "admin"]);
+      try {
+        const existShop = await Shop.findById(_id);
+        if (!existShop) {
+          return {
+            isSuccess: false,
+            message: {
+              messageEn: "Shop not found",
+              messageKh: "មិនមានហាង",
+            },
+          };
+        }
+
+        const usersToAdd = Array.isArray(userId) ? userId : [userId];
+
+        await Shop.findByIdAndUpdate(
+          _id,
+          { $addToSet: { user: { $each: usersToAdd } } },
+          { new: true }
+        );
+
+        return successResponse();
+      } catch (error) {
+        console.error(error);
+        return {
+          isSuccess: false,
+          message: {
+            messageEn: "Something went wrong",
+            messageKh: "មានបញ្ហា",
+          },
+        };
+      }
+    },
+    deleteUserFromShop: async (_, { _id, userId }, { user }) => {
+      requireRole(user, ["superAdmin"]);
+      try {
+        const existShop = await Shop.findById(_id);
+        if (!existShop) {
+          return {
+            isSuccess: false,
+            message: {
+              messageEn: "Shop not found",
+              messageKh: "មិនមានហាង",
+            },
+          };
+        }
+
+        const usersToRemove = Array.isArray(userId) ? userId : [userId];
+
+        await Shop.findByIdAndUpdate(
+          _id,
+          { $pull: { user: { $in: usersToRemove } } },
+          { new: true }
+        );
+
+        return successResponse();
+      } catch (error) {
+        console.error(error);
+        return {
+          isSuccess: false,
+          message: {
+            messageEn: "Something went wrong",
+            messageKh: "មានបញ្ហា",
+          },
+        };
+      }
+    },
+
+    updateShop: async (_, { _id, input }, { user }) => {
+      requireRole(user, ["admin", "superAdmin"]);
+      try {
+        const existShop = await Shop.findById(_id);
+        if (!existShop) {
+          return {
+            isSuccess: false,
+            message: {
+              messageEn: "Shop not found",
+              messageKh: "មិនមានហាង",
+            },
+          };
+        }
+        await Shop.findByIdAndUpdate(_id, input, { new: true });
+        return successResponse();
+      } catch (error) {
+        return errorResponse();
+      }
+    },
+    deleteShop: async (_, { _id }) => {
+      try {
+        const existingShop = await Shop.findById(_id);
+        if (!existingShop) {
+          return {
+            isSuccess: false,
+            message: {
+              messageEn: "Shop not found",
+              messageKh: "មិនមានហាង",
+            },
+          };
+        }
+
+        await Shop.findByIdAndDelete(_id);
+        return successResponse();
+      } catch (error) {
+        return errorResponse();
+      }
+    },
+    createProduct: async (_, { input }, { user }) => {
+      try {
+        const existingProduct = await Product.findOne({
+          $or: [{ nameKh: input.nameKh }, { nameEn: input.nameEn }],
+        });
+
+        if (existingProduct) {
+          return {
+            isSuccess: false,
+            message: {
+              messageEn: "Product already exists",
+              messageKh: "ផលិតផលមានរូចហើយ",
+            },
+          };
+        }
+
+        // const existShop = await Shop.findById(input.shopIds?.[0]);
+        // if (!existShop) {
+        //   return {
+        //     isSuccess: false,
+        //     message: { messageEn: "Shop not found", messageKh: "មិនមានហាង" },
+        //   };
+        // }
+
+        const newProduct = new Product({
+          ...input,
+          active: true,
+        });
+
+        await newProduct.save();
+        const initialStock = input.stock || 0;
+        await SubProduct.create({
+          unitId: input.unitId,
+          productImg:input.image,
+          qty: initialStock,
+          saleType:"retail",
+          parentProductId: newProduct._id,
+        });
+
+        if (initialStock > 0) {
+          await StockMovement.create({
+            // shop: input?.shopIds[0],
+            product: newProduct._id,
+            type: "in",
+            quantity: initialStock,
+            reason: "Initial product creation",
+            reference: "CREATE_PRODUCT",
+            previousStock: 0,
+            newStock: initialStock,
+          });
+        }
+        return successResponse();
+      } catch (error) {
+        console.error(error);
+        return errorResponse();
+      }
+    },
+
+    updateProduct: async (_, { _id, input }, { user }) => {
+      try {
+        const product = await Product.findById(_id);
+        if (!product) {
+          return {
+            isSuccess: false,
+            message: {
+              messageEn: "Product not found",
+              messageKh: "រកមិនឃើញផលិតផល",
+            },
+          };
+        }
+
+        const existingProduct = await Product.findOne({
+          $or: [{ nameKh: input.nameKh }, { nameEn: input.nameEn }],
+          _id: { $ne: _id },
+        });
+
+        if (existingProduct) {
+          return {
+            isSuccess: false,
+            message: {
+              messageEn: "Product already exists",
+              messageKh: "ផលិតផលមានរួចហើយ",
+            },
+          };
+        }
+
+        Object.assign(product, input);
+        await product.save();
+
+        if (input.stock !== undefined) {
+          const shopId = input.shopIds?.[0] || product.shopIds?.[0];
+          await StockMovement.create({
+            // shop: shopId,
+            product: product._id,
+            type: "adjust",
+            quantity: input.stock,
+            reason: "Update product stock",
+            reference: "UPDATE_PRODUCT",
+            previousStock: 0,
+            newStock: input.stock,
+          });
+        }
+
+        return successResponse();
+      } catch (error) {
+        console.error(error);
+        return errorResponse();
+      }
+    },
+
+    deleteProduct: async (_, { _id }) => {
+      try {
+        const product = await Product.findById(_id);
+        if (!product) return errorResponse("Product not found");
+        await Product.deleteOne({ _id });
+        return successResponse();
+      } catch (error) {
+        console.error(error);
+        return errorResponse();
+      }
+    },
+
+    updateProductStatus: async (_, { _id, active }) => {
+      try {
+        const product = await Product.findById(_id);
+        if (!product) return errorResponse("Product not found");
+        product.active = active;
+        await product.save();
+        return successResponse();
+      } catch (error) {
+        console.error(error);
+        return errorResponse();
+      }
+    },
+
+    assignProductToShops: async (_, { _id, shopIds }) => {
+      try {
+        const product = await Product.findById(_id);
+        if (!product) return errorResponse("Product not found");
+        product.shopIds = [
+          ...new Set([...(product.shopIds || []), ...shopIds]),
+        ];
+        await product.save();
+        return successResponse();
+      } catch (error) {
+        console.error(error);
+        return errorResponse();
+      }
+    },
+
+    removeProductFromShops: async (_, { _id, shopIds }) => {
+      try {
+        const product = await Product.findById(_id);
+        if (!product) return errorResponse("Product not found");
+        product.shopIds = (product.shopIds || []).filter(
+          (id) => !shopIds.includes(id.toString())
+        );
+        await product.save();
+        return successResponse();
+      } catch (error) {
+        console.error(error);
+        return errorResponse();
+      }
+    },
+
+    createSubProduct: async (_, { parentProductId, input }, { user }) => {
+      try {
+        if (!mongoose.Types.ObjectId.isValid(parentProductId)) {
+          return errorResponse("Invalid parent product ID");
+        }
+        const parentProduct = await Product.findById(parentProductId);
+        if (!parentProduct) return errorResponse("Parent product not found");
+
+        const newSubProduct = new SubProduct({
+          ...input,
+          unitId: input?.unitId || undefined,
+          shopId: input?.shopId || [],
+          parentProductId,
+        });
+        await newSubProduct.save();
+
+        return successResponse();
+      } catch (error) {
+        console.error(error);
+        return errorResponse();
+      }
+    },
+
+    updateSubProduct: async (_, { _id, input }, { user }) => {
+      try {
+        const product = await SubProduct.findById(_id);
+        if (!product) return errorResponse("SubProduct not found");
+
+        Object.assign(product, {
+          ...input,
+          unitId: input?.unitId || product.unitId,
+          shopId: input?.shopId ?? product.shopId,
+        });
+
+        await product.save();
+
+        return successResponse();
+      } catch (error) {
+        console.error(error);
+        return errorResponse();
+      }
+    },
+
+    deleteSubProduct: async (_, { _id }) => {
+      try {
+        const product = await SubProduct.findById(_id);
+        if (!product) return errorResponse("SubProduct not found");
+        await SubProduct.deleteOne({ _id });
+        return successResponse();
+      } catch (error) {
+        console.error(error);
         return errorResponse();
       }
     },

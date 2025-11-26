@@ -9,10 +9,14 @@
     "start": "node src/index.js"
   },
   "dependencies": {
+    "@apollo/server": "^5.1.0",
     "apollo-server": "^3.13.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.3",
+    "express": "^5.1.0",
     "graphql": "^16.12.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.19.4"
