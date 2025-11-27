@@ -9,6 +9,7 @@ import SubProduct from "../models/SubProduct.js";
 import Category from "../models/Category.js";
 import Product from "../models/Product.js";
 import { errorResponse, successResponse } from "../utils/response.js";
+import Sale from "../models/Sale.js";
 import Shop from "../models/Shop.js";
 import Unit from "../models/Unit.js";
 import User from "../models/User.js";
@@ -30,6 +31,13 @@ const requireRole = (user, roles) => {
       }
     );
   }
+};
+
+// Simple sale number generator: S-YYYYMMDD-rand5
+const generateSaleNumber = () => {
+  const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const rand = Math.floor(10000 + Math.random() * 90000);
+  return `S-${datePart}-${rand}`;
 };
 
 export const resolvers = {
@@ -237,6 +245,41 @@ export const resolvers = {
         return [];
       }
     },
+    getProductForSaleWithPagination:async(_,{shopId, categoryId, page = 1, limit = 5, pagination = true, keyword = ""} )=>{
+      try {
+        const query = {
+          shopId:shopId,
+          sell:true,
+          ...( keyword && {
+            $or:[
+              {nameKh: { $regex: keyword, $options: "i"}},
+              {nameEn: { $regex: keyword, $options: "i"}}
+            ]
+          })
+        }
+        const paginationQuery = await paginateQuery({
+          model: SubProduct,
+          query,
+          page,
+          limit,
+          pagination,
+          populate: [
+            "unitId",
+            {
+              path: "parentProductId",
+              match: categoryId ? { categoryId } : {},
+              populate: { path: "categoryId" } 
+            }
+          ]
+        });
+        return {
+          data: paginationQuery?.data,
+          paginator: paginationQuery?.paginator
+        }
+      } catch (error) {
+          console.error("getSubProducts error:", error);
+      }
+    }
   },
 
   Mutation: {
@@ -691,9 +734,9 @@ export const resolvers = {
         const initialStock = input.stock || 0;
         await SubProduct.create({
           unitId: input.unitId,
-          productImg:input.image,
+          productImg: input.image,
           qty: initialStock,
-          saleType:"retail",
+          saleType: "retail",
           parentProductId: newProduct._id,
         });
 
@@ -876,6 +919,110 @@ export const resolvers = {
         console.error(error);
         return errorResponse();
       }
+    },
+
+createSale: async (_, { input }, { user }) => {
+  // requireRole(user, ["superAdmin","admin", "manager", "cashier"]);
+  try {
+    if (!input?.shopId) {
+      return errorResponse("shopId is required");
+    }
+
+    const saleNumber = generateSaleNumber();
+    const shop = input.shopId;
+
+    const sale = new Sale({
+      ...input,
+      saleNumber,
+      shopId: shop,
+      cashier: user.id,
+    });
+
+    await sale.save();
+
+    // for (const item of input.items) {
+    //   const product = await Product.findById(item.product);
+    //   if (product) {
+    //     const previousStock = product.stock;
+    //     const newStock = previousStock - item.quantity;
+
+    //     if (newStock < 0) {
+    //       return errorResponse(`Insufficient stock for ${product.name}`);
+    //     }
+
+    //     product.stock = newStock;
+    //     product.updatedAt = new Date();
+    //     await product.save();
+
+    //     const stockMovement = new StockMovement({
+    //       product: item.product,
+    //       type: "out",
+    //       quantity: item.quantity,
+    //       reason: "Sale",
+    //       reference: saleNumber,
+    //       shop,
+    //       user: user.id,
+    //       previousStock,
+    //       newStock,
+    //     });
+    //     await stockMovement.save();
+    //   }
+    // }
+
+    const populatedSale = await Sale.findById(sale._id)
+      .populate("cashier")
+      .populate("items.product");
+
+    return {
+      ...successResponse(),
+      populatedSale
+    }
+  } catch (error) {
+    console.error("createSale error:", error);
+    return errorResponse(error?.message || "Failed to create sale");
+  }
+},
+    refundSale: async (_, { id }, { user }) => {
+      requireRole(user, ["superAdmin", "admin"]);
+      const sale = await Sale.findById(id);
+      if (!sale) {
+        throw new GraphQLError("Sale not found");
+      }
+
+      if (sale.status === "refunded") {
+        throw new GraphQLError("Sale already refunded");
+      }
+
+      sale.status = "refunded";
+      await sale.save();
+
+      for (const item of sale.items) {
+        const product = await Product.findById(item.product);
+        if (product) {
+          const previousStock = product.stock;
+          const newStock = previousStock + item.quantity;
+
+          product.stock = newStock;
+          product.updatedAt = new Date();
+          await product.save();
+
+          const stockMovement = new StockMovement({
+            product: item.product,
+            type: "in",
+            quantity: item.quantity,
+            reason: "Refund",
+            reference: sale.saleNumber,
+            user: user.id,
+            previousStock,
+            newStock,
+          });
+          await stockMovement.save();
+        }
+      }
+
+      return await Sale.findById(id)
+        .populate("cashier")
+        .populate("items.product");
     },
   },
 };

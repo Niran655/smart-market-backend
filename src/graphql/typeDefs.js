@@ -66,29 +66,53 @@ export const typeDefs = gql`
   type SubProduct {
     _id: ID!
     #information
-    saleType: String                
-    unitId:Unit
-    qty: Int                      
-    barCode: String               
-    productDes:String
-    productImg:String
-    using: Boolean                 
-    check: Boolean                
-    sell:Boolean
-    shopId:[Shop]
+    saleType: String
+    unitId: Unit
+    qty: Int
+    barCode: String
+    productDes: String
+    productImg: String
+    using: Boolean
+    check: Boolean
+    sell: Boolean
+    shopId: [Shop]
     #price
-    servicePrice: Float  
-    salePrice: Float          
-    taxRate: Float   
-    costPrice:Float       
-    priceImg: String 
-    totalPrice:Float 
-    priceDes: String        
-    parentProductId:ID    
+    servicePrice: Float
+    salePrice: Float
+    taxRate: Float
+    costPrice: Float
+    priceImg: String
+    totalPrice: Float
+    priceDes: String
+    parentProductId: Product
     createdAt: Date!
     updatedAt: Date!
   }
 
+  type Sale {
+    _id: ID
+    saleNumber: String
+    cashier: User
+    shopId:Shop
+    items: [SaleItem]
+    subtotal: Float
+    tax: Float
+    discount: Float
+    total: Float
+    paymentMethod: PaymentMethod
+    amountPaid: Float
+    change: Float
+    status: SaleStatus
+    createdAt: Date
+  }
+
+  type SaleItem {
+    product: Product!
+    name: String!
+    price: Float!
+    quantity: Int!
+    total: Float!
+  }
 
   type StockMovement {
     _id: ID
@@ -157,6 +181,12 @@ export const typeDefs = gql`
     data: [Product]
     paginator: PaginatorMeta
   }
+
+  type SubProductPaginator {
+    data: [SubProduct]
+    paginator: PaginatorMeta
+  }
+
   type Message {
     messageEn: String
     messageKh: String
@@ -181,9 +211,20 @@ export const typeDefs = gql`
     adjustment
   }
 
-  enum SleType{
+  enum SleType {
     retail
     wholesale
+  }
+
+  enum PaymentMethod {
+    cash
+    card
+    qr
+  }
+
+  enum SaleStatus {
+    completed
+    refunded
   }
 
   input RegisterInput {
@@ -239,25 +280,45 @@ export const typeDefs = gql`
 
   input SubProductInput {
     #information
-    saleType: SleType                
-    unitId:ID
-    qty: Int                      
-    barCode: String               
-    productDes:String
-    productImg:String
-    using: Boolean                 
-    check: Boolean                
-    sell:Boolean
-    shopId:[ID]
+    saleType: SleType
+    unitId: ID
+    qty: Int
+    barCode: String
+    productDes: String
+    productImg: String
+    using: Boolean
+    check: Boolean
+    sell: Boolean
+    shopId: [ID]
     #price
-    servicePrice: Float  
-    salePrice: Float          
-    taxRate: Float   
-    costPrice:Float       
-    priceImg: String 
-    totalPrice:Float 
-    priceDes: String        
-    parentProductId:ID     
+    servicePrice: Float
+    salePrice: Float
+    taxRate: Float
+    costPrice: Float
+    priceImg: String
+    totalPrice: Float
+    priceDes: String
+    parentProductId: ID
+  }
+
+  input SaleInput {
+    items: [SaleItemInput]
+    subtotal: Float
+    tax: Float
+    shopId: ID
+    discount: Float
+    total: Float
+    paymentMethod: PaymentMethod
+    amountPaid: Float
+    change: Float
+  }
+
+  input SaleItemInput {
+    product: ID
+    name: String
+    price: Float
+    quantity: Int
+    total: Float
   }
 
   input UnitInput {
@@ -304,14 +365,11 @@ export const typeDefs = gql`
     getShopByShopId(_id: ID, shopId: ID!): Shop
 
     #product
-    getProductsWithPagination(
-      page: Int
-      limit: Int
-      pagination: Boolean
-      keyword: String
-    ): ProductPaginator
+    getProductsWithPagination(page: Int, limit: Int, pagination: Boolean, keyword: String): ProductPaginator
     getMainProducts(shopId: ID): [Product]
     getSubProducts(parentProductId: ID!): [SubProduct]
+    getProductForSaleWithPagination(shopId:ID, categoryId:String, page: Int, limit: Int, pagination: Boolean, keyword: String): SubProductPaginator
+
   }
 
   type Mutation {
@@ -346,12 +404,17 @@ export const typeDefs = gql`
     deleteProduct(_id: ID!): MutationResponse!
     updateProductStatus(_id: ID!, active: Boolean!): MutationResponse!
 
+    #sale
+    createSale(input: SaleInput): MutationResponse
+    refundSale(id: ID!): Sale!
+
     # Assign product to shops
     assignProductToShops(_id: ID!, shopIds: [ID]!): MutationResponse!
     removeProductFromShops(_id: ID!, shopIds: [ID]!): MutationResponse!
+
     # Sub-product (Retail/Wholesale)
-    createSubProduct(parentProductId: ID!,input: SubProductInput): MutationResponse!
-    updateSubProduct( _id:ID,input:SubProductInput) : MutationResponse!
+    createSubProduct(parentProductId: ID!input: SubProductInput): MutationResponse!
+    updateSubProduct(_id: ID, input: SubProductInput): MutationResponse!
     deleteSubProduct(_id: ID!): MutationResponse!
   }
 `;

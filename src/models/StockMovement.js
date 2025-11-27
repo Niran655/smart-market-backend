@@ -5,7 +5,6 @@ const stockMovementSchema = new mongoose.Schema(
     shop: { type: mongoose.Schema.Types.ObjectId, ref: "Shop" },
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     product: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
-
     type: {
       type: String,
       enum: ["in", "out", "adjustment"],
