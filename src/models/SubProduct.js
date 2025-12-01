@@ -42,6 +42,10 @@ const subProductSchema = new mongoose.Schema(
 
     priceDes: { type: String },
 
+    //=====================stock===========================
+    stock: { type: Number, default: 0 },
+    minStock: { type: Number },
+
     parentProductId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",

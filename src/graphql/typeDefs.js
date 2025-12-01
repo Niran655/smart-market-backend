@@ -56,8 +56,6 @@ export const typeDefs = gql`
     categoryId: Category
     unitId: Unit
     type: String
-    stock: Int
-    minStock: Int
     remark: String
     active: Boolean
     createdAt: Date!
@@ -87,13 +85,46 @@ export const typeDefs = gql`
     parentProductId: Product
     createdAt: Date!
     updatedAt: Date!
+    #stock
+    stock: Int
+    minStock: Int
+  }
+
+  type Warehouse {
+    _id: ID!
+    subProduct: SubProduct
+    stock: Int
+    createdAt: Date
+    updatedAt: Date
+  }
+
+  input AdjustStockInput {
+    subProductId: ID!
+    quantity: Int!
+    type: StockMovementType!
+    reason: String
+  }
+
+  type StockMovement {
+    _id: ID
+    shop: Shop
+    user: User
+    product: Product
+    subProduct:SubProduct
+    type: StockMovementType
+    quantity: Int
+    reason: String
+    reference: String
+    previousStock: Int
+    newStock: Int
+    createdAt: Date
   }
 
   type Sale {
     _id: ID
     saleNumber: String
-    cashier: User
-    shopId:Shop
+    user: User
+    shopId: Shop
     items: [SaleItem]
     subtotal: Float
     tax: Float
@@ -112,20 +143,6 @@ export const typeDefs = gql`
     price: Float!
     quantity: Int!
     total: Float!
-  }
-
-  type StockMovement {
-    _id: ID
-    shop: Shop
-    user: User
-    product: Product
-    type: StockMovementType
-    quantity: Int
-    reason: String
-    reference: String
-    previousStock: Int
-    newStock: Int
-    createdAt: Date
   }
 
   type Unit {
@@ -184,6 +201,11 @@ export const typeDefs = gql`
 
   type SubProductPaginator {
     data: [SubProduct]
+    paginator: PaginatorMeta
+  }
+
+  type WarehousePaginator {
+    data: [Warehouse]
     paginator: PaginatorMeta
   }
 
@@ -299,27 +321,33 @@ export const typeDefs = gql`
     totalPrice: Float
     priceDes: String
     parentProductId: ID
+    #stock
+    stock: Int
+    minStock: Int
   }
 
-  input SaleInput {
-    items: [SaleItemInput]
-    subtotal: Float
-    tax: Float
-    shopId: ID
-    discount: Float
-    total: Float
-    paymentMethod: PaymentMethod
-    amountPaid: Float
-    change: Float
-  }
+input SaleInput {
+  items: [SaleItemInput]
+  user: ID
+  subtotal: Float
+  tax: Float
+  shopId: ID
+  discount: Float
+  total: Float
+  paymentMethod: PaymentMethod
+  amountPaid: Float
+  change: Float
+}
 
-  input SaleItemInput {
-    product: ID
-    name: String
-    price: Float
-    quantity: Int
-    total: Float
-  }
+input SaleItemInput {
+  product: ID
+  subProductId: ID
+  name: String
+  price: Float
+  quantity: Int
+  total: Float
+}
+
 
   input UnitInput {
     nameKh: String
@@ -365,11 +393,30 @@ export const typeDefs = gql`
     getShopByShopId(_id: ID, shopId: ID!): Shop
 
     #product
-    getProductsWithPagination(page: Int, limit: Int, pagination: Boolean, keyword: String): ProductPaginator
+    getProductsWithPagination(
+      page: Int
+      limit: Int
+      pagination: Boolean
+      keyword: String
+    ): ProductPaginator
     getMainProducts(shopId: ID): [Product]
     getSubProducts(parentProductId: ID!): [SubProduct]
-    getProductForSaleWithPagination(shopId:ID, categoryId:String, page: Int, limit: Int, pagination: Boolean, keyword: String): SubProductPaginator
+    getProductForSaleWithPagination(
+      shopId: ID
+      categoryId: String
+      page: Int
+      limit: Int
+      pagination: Boolean
+      keyword: String
+    ): SubProductPaginator
 
+    #warehouse
+    getProductWareHouseWithPagination(
+      page: Int
+      limit: Int
+      pagination: Boolean
+      keyword: String
+    ): WarehousePaginator
   }
 
   type Mutation {
@@ -404,6 +451,9 @@ export const typeDefs = gql`
     deleteProduct(_id: ID!): MutationResponse!
     updateProductStatus(_id: ID!, active: Boolean!): MutationResponse!
 
+    #adjust stock
+    adjustStock(input: AdjustStockInput!): MutationResponse
+
     #sale
     createSale(input: SaleInput): MutationResponse
     refundSale(id: ID!): Sale!
@@ -413,7 +463,10 @@ export const typeDefs = gql`
     removeProductFromShops(_id: ID!, shopIds: [ID]!): MutationResponse!
 
     # Sub-product (Retail/Wholesale)
-    createSubProduct(parentProductId: ID!input: SubProductInput): MutationResponse!
+    createSubProduct(
+      parentProductId: ID!
+      input: SubProductInput
+    ): MutationResponse!
     updateSubProduct(_id: ID, input: SubProductInput): MutationResponse!
     deleteSubProduct(_id: ID!): MutationResponse!
   }

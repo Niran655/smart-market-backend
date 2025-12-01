@@ -2,24 +2,21 @@ import mongoose from "mongoose";
 
 const saleSchema = new mongoose.Schema({
   saleNumber: { type: String, required: true, unique: true },
-  cashier: {
+  user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: false,
   },
   items: [
-    {
-      product: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Product",
-        required: false,
-      },
-      name: { type: String, required: false },
-      price: { type: Number, required: false },
-      quantity: { type: Number, required: false },
-      total: { type: Number, required: false },
-    },
-  ],
+  {
+    product: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+    subProductId: { type: mongoose.Schema.Types.ObjectId, ref: "SubProduct" },
+    name: String,
+    price: Number,
+    quantity: Number,
+    total: Number,
+  }
+],
   shopId: { type: mongoose.Schema.Types.ObjectId, ref: "Shop", required: false },
   subtotal: { type: Number, required: false },
   tax: { type: Number, required: false },

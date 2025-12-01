@@ -7,8 +7,6 @@ const productSchema = new mongoose.Schema(
     nameEn: { type: String },
     image: { type: String },
     type: { type: String },
-    stock: { type: Number, default: 0 },
-    minStock: { type: Number },
     categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
     unitId: { type: mongoose.Schema.Types.ObjectId, ref: "Unit" },
     remark: { type: String },

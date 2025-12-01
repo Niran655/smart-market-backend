@@ -6,6 +6,7 @@ import { GraphQLError } from "graphql";
 import StockMovement from "../models/StockMovement.js";
 import paginateQuery from "../utils/paginateQuery.js";
 import SubProduct from "../models/SubProduct.js";
+import Warehouse from "../models/Warehouse.js";
 import Category from "../models/Category.js";
 import Product from "../models/Product.js";
 import { errorResponse, successResponse } from "../utils/response.js";
@@ -245,18 +246,28 @@ export const resolvers = {
         return [];
       }
     },
-    getProductForSaleWithPagination:async(_,{shopId, categoryId, page = 1, limit = 5, pagination = true, keyword = ""} )=>{
+    getProductForSaleWithPagination: async (
+      _,
+      {
+        shopId,
+        categoryId,
+        page = 1,
+        limit = 5,
+        pagination = true,
+        keyword = "",
+      }
+    ) => {
       try {
         const query = {
-          shopId:shopId,
-          sell:true,
-          ...( keyword && {
-            $or:[
-              {nameKh: { $regex: keyword, $options: "i"}},
-              {nameEn: { $regex: keyword, $options: "i"}}
-            ]
-          })
-        }
+          shopId: shopId,
+          sell: true,
+          ...(keyword && {
+            $or: [
+              { nameKh: { $regex: keyword, $options: "i" } },
+              { nameEn: { $regex: keyword, $options: "i" } },
+            ],
+          }),
+        };
         const paginationQuery = await paginateQuery({
           model: SubProduct,
           query,
@@ -268,18 +279,46 @@ export const resolvers = {
             {
               path: "parentProductId",
               match: categoryId ? { categoryId } : {},
-              populate: { path: "categoryId" } 
-            }
-          ]
+              populate: { path: "categoryId" },
+            },
+          ],
         });
         return {
           data: paginationQuery?.data,
-          paginator: paginationQuery?.paginator
-        }
+          paginator: paginationQuery?.paginator,
+        };
       } catch (error) {
-          console.error("getSubProducts error:", error);
+        console.error("getSubProducts error:", error);
       }
-    }
+    },
+    getProductWareHouseWithPagination: async (
+      _,
+      { page = 1, limit = 5, pagination = true, keyword = "" }
+    ) => {
+      try {
+        const paginationQuery = await paginateQuery({
+          model: Warehouse,
+          // query,
+          page,
+          limit,
+          pagination,
+          populate: [
+            {
+              path: "subProduct",
+              populate: {
+                path: ["unitId", "parentProductId"],
+              },
+            },
+          ],
+        });
+        return {
+          data: paginationQuery?.data,
+          paginator: paginationQuery?.paginator,
+        };
+      } catch (error) {
+        console.error("error", error);
+      }
+    },
   },
 
   Mutation: {
@@ -731,6 +770,7 @@ export const resolvers = {
         });
 
         await newProduct.save();
+
         const initialStock = input.stock || 0;
         await SubProduct.create({
           unitId: input.unitId,
@@ -740,18 +780,18 @@ export const resolvers = {
           parentProductId: newProduct._id,
         });
 
-        if (initialStock > 0) {
-          await StockMovement.create({
-            // shop: input?.shopIds[0],
-            product: newProduct._id,
-            type: "in",
-            quantity: initialStock,
-            reason: "Initial product creation",
-            reference: "CREATE_PRODUCT",
-            previousStock: 0,
-            newStock: initialStock,
-          });
-        }
+        // if (initialStock > 0) {
+        //   await StockMovement.create({
+        //     // shop: input?.shopIds[0],
+        //     product: newProduct._id,
+        //     type: "in",
+        //     quantity: initialStock,
+        //     reason: "Initial product creation",
+        //     reference: "CREATE_PRODUCT",
+        //     previousStock: 0,
+        //     newStock: initialStock,
+        //   });
+        // }
         return successResponse();
       } catch (error) {
         console.error(error);
@@ -789,20 +829,6 @@ export const resolvers = {
 
         Object.assign(product, input);
         await product.save();
-
-        if (input.stock !== undefined) {
-          const shopId = input.shopIds?.[0] || product.shopIds?.[0];
-          await StockMovement.create({
-            // shop: shopId,
-            product: product._id,
-            type: "adjust",
-            quantity: input.stock,
-            reason: "Update product stock",
-            reference: "UPDATE_PRODUCT",
-            previousStock: 0,
-            newStock: input.stock,
-          });
-        }
 
         return successResponse();
       } catch (error) {
@@ -871,20 +897,76 @@ export const resolvers = {
         if (!mongoose.Types.ObjectId.isValid(parentProductId)) {
           return errorResponse("Invalid parent product ID");
         }
+
         const parentProduct = await Product.findById(parentProductId);
         if (!parentProduct) return errorResponse("Parent product not found");
-
         const newSubProduct = new SubProduct({
           ...input,
           unitId: input?.unitId || undefined,
           shopId: input?.shopId || [],
           parentProductId,
         });
-        await newSubProduct.save();
 
+        await newSubProduct.save();
+        if (newSubProduct.check) {
+          const exists = await Warehouse.findOne({
+            subProduct: newSubProduct._id,
+          });
+          if (!exists) {
+            await Warehouse.create({
+              subProduct: newSubProduct._id,
+              stock: 0,
+              minStock: 0,
+            });
+          }
+        }
         return successResponse();
       } catch (error) {
         console.error(error);
+        return errorResponse();
+      }
+    },
+    adjustStock: async (_, { input }, { user }) => {
+      try {
+        const { subProductId, quantity, type, reason } = input;
+
+        const sub = await SubProduct.findById(subProductId);
+        if (!sub) throw new Error("SubProduct not found");
+
+        const warehouse = await Warehouse.findOne({ subProduct: subProductId });
+        if (!warehouse) throw new Error("Warehouse entry not found");
+
+        const previousStock = sub.stock || 0;
+        let newStock = previousStock;
+
+        if (type === "in") newStock += quantity;
+        else if (type === "out") {
+          newStock -= quantity;
+          if (newStock < 0) newStock = 0;
+        }
+
+        sub.stock = newStock;
+        await sub.save();
+
+        warehouse.stock = newStock;
+        await warehouse.save();
+
+        const movement = await StockMovement.create({
+          shop: sub.shopId,
+          user: user?._id,
+          product: sub.parentProductId,
+          subProduct: sub._id,
+          type,
+          quantity,
+          reason,
+          previousStock,
+          newStock,
+        });
+        return {
+          ...successResponse(),
+          movement,
+        };
+      } catch (error) {
         return errorResponse();
       }
     },
@@ -901,6 +983,16 @@ export const resolvers = {
         });
 
         await product.save();
+        if (product.check) {
+          const exists = await Warehouse.findOne({ subProduct: product._id });
+          if (!exists) {
+            await Warehouse.create({
+              subProduct: product._id,
+              stock: 0,
+              minStock: 0,
+            });
+          }
+        }
 
         return successResponse();
       } catch (error) {
@@ -921,67 +1013,95 @@ export const resolvers = {
       }
     },
 
-createSale: async (_, { input }, { user }) => {
-  // requireRole(user, ["superAdmin","admin", "manager", "cashier"]);
-  try {
-    if (!input?.shopId) {
-      return errorResponse("shopId is required");
-    }
+    createSale: async (_, { input }, { user }) => {
+      try {
+        if (!input?.shopId) {
+          return errorResponse("shopId is required");
+        }
 
-    const saleNumber = generateSaleNumber();
-    const shop = input.shopId;
+        if (!input?.items || input.items.length === 0) {
+          return errorResponse("Sale items are required");
+        }
 
-    const sale = new Sale({
-      ...input,
-      saleNumber,
-      shopId: shop,
-      cashier: user.id,
-    });
+        const saleNumber = generateSaleNumber();
+        const userId = user?._id || null;
 
-    await sale.save();
+        const sale = new Sale({
+          ...input,
+          saleNumber,
+          shopId: input.shopId,
+          user: userId,
+        });
 
-    // for (const item of input.items) {
-    //   const product = await Product.findById(item.product);
-    //   if (product) {
-    //     const previousStock = product.stock;
-    //     const newStock = previousStock - item.quantity;
+        await sale.save();
 
-    //     if (newStock < 0) {
-    //       return errorResponse(`Insufficient stock for ${product.name}`);
-    //     }
+        for (const item of input.items) {
+          const subProduct = await SubProduct.findById(item.subProductId);
+          if (!subProduct) {
+            return errorResponse("SubProduct not found");
+          }
 
-    //     product.stock = newStock;
-    //     product.updatedAt = new Date();
-    //     await product.save();
+          let previousStock = subProduct.stock;
+          let newStock = subProduct.stock;
 
-    //     const stockMovement = new StockMovement({
-    //       product: item.product,
-    //       type: "out",
-    //       quantity: item.quantity,
-    //       reason: "Sale",
-    //       reference: saleNumber,
-    //       shop,
-    //       user: user.id,
-    //       previousStock,
-    //       newStock,
-    //     });
-    //     await stockMovement.save();
-    //   }
-    // }
+          if (subProduct.check === true) {
+            const warehouse = await Warehouse.findOne({
+              subProduct: subProduct._id,
+            });
 
-    const populatedSale = await Sale.findById(sale._id)
-      .populate("cashier")
-      .populate("items.product");
+            if (!warehouse) {
+              return errorResponse(
+                `Warehouse record missing for subProduct ${subProduct._id}`
+              );
+            }
 
-    return {
-      ...successResponse(),
-      populatedSale
-    }
-  } catch (error) {
-    console.error("createSale error:", error);
-    return errorResponse(error?.message || "Failed to create sale");
-  }
-},
+            newStock = previousStock - item.quantity;
+
+            if (newStock < 0) {
+              return {
+                isSuccess: false,
+                message: {
+                  messageEn: "Not enough stock",
+                  messageKh: "មិនមានស្តុកគ្រប់គ្រាន់",
+                },
+              }
+            }
+
+            subProduct.stock = newStock;
+            await subProduct.save();
+
+            warehouse.stock = newStock;
+            await warehouse.save();
+          }
+
+          await StockMovement.create({
+            shop: input.shopId,
+            user: userId,
+            product: subProduct.parentProductId,
+            subProduct: subProduct._id,
+            type: "out",
+            quantity: item.quantity,
+            reason: "Sale",
+            reference: saleNumber,
+            previousStock,
+            newStock,
+          });
+        }
+
+        const populatedSale = await Sale.findById(sale._id)
+          .populate("user")
+          .populate("items.product");
+
+        return {
+          ...successResponse(),
+          populatedSale,
+        };
+      } catch (error) {
+        console.error("createSale error:", error);
+        return errorResponse(error?.message || "Failed to create sale");
+      }
+    },
+
     refundSale: async (_, { id }, { user }) => {
       requireRole(user, ["superAdmin", "admin"]);
       const sale = await Sale.findById(id);
