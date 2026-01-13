@@ -31,7 +31,7 @@ const saleSchema = new mongoose.Schema({
   change: { type: Number, default: 0 },
   status: {
     type: String,
-    enum: ["completed", "refunded"],
+    enum: ["completed", "refunded","pending"],
     default: "completed",
   },
   createdAt: { type: Date, default: Date.now },

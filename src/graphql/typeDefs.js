@@ -98,10 +98,22 @@ export const typeDefs = gql`
     updatedAt: Date
   }
 
+  type WarehouseInShop {
+    _id: ID!
+    shop: Shop
+    subProduct: SubProduct
+    stock: Int
+    minStock: Int
+    createdAt: Date
+    updatedAt: Date
+  }
+
+
   input AdjustStockInput {
     subProductId: ID!
     quantity: Int!
     type: StockMovementType!
+    status:String
     reason: String
   }
 
@@ -209,6 +221,11 @@ export const typeDefs = gql`
     paginator: PaginatorMeta
   }
 
+  type WarehouseInShopPaginator {
+    data: [WarehouseInShop]
+    paginator: PaginatorMeta
+  }
+
   type Message {
     messageEn: String
     messageKh: String
@@ -246,6 +263,7 @@ export const typeDefs = gql`
 
   enum SaleStatus {
     completed
+    pending
     refunded
   }
 
@@ -417,6 +435,15 @@ input SaleItemInput {
       pagination: Boolean
       keyword: String
     ): WarehousePaginator
+     
+
+    getProductWareHouseInShopoWithPagination(
+      shopId: ID
+      page: Int
+      limit: Int
+      pagination: Boolean
+      keyword: String
+    ):WarehouseInShopPaginator
   }
 
   type Mutation {
@@ -453,7 +480,7 @@ input SaleItemInput {
 
     #adjust stock
     adjustStock(input: AdjustStockInput!): MutationResponse
-
+    
     #sale
     createSale(input: SaleInput): MutationResponse
     refundSale(id: ID!): Sale!
