@@ -1,6 +1,6 @@
 import paginateQuery from "../utils/paginateQuery.js";
 import Warehouse from "../models/Warehouse.js";
-import { successResponse } from "../utils/response.js";
+ 
 
 export const warehouseResolvers = {
   Query: {

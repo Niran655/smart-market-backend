@@ -108,13 +108,30 @@ export const typeDefs = gql`
     updatedAt: Date
   }
 
-
   input AdjustStockInput {
     subProductId: ID!
     quantity: Int!
     type: StockMovementType!
-    status:String
+    status: String
     reason: String
+  }
+
+  type WarehouseTransfer {
+    _id: ID!
+    fromWarehouse: Warehouse
+    toShop: Shop
+    items: [WarehouseTransferItem]
+    status: TransferStatus
+    requestedBy: User
+    acceptedBy: User
+    remark: String
+    createdAt: Date
+    acceptedAt: Date
+  }
+
+  type WarehouseTransferItem {
+    subProduct: SubProduct!
+    quantity: Int!
   }
 
   type StockMovement {
@@ -122,11 +139,11 @@ export const typeDefs = gql`
     shop: Shop
     user: User
     product: Product
-    subProduct:SubProduct
+    subProduct: SubProduct
     type: StockMovementType
     quantity: Int
     reason: String
-    reference: String
+    reference: String # transfer ID
     previousStock: Int
     newStock: Int
     createdAt: Date
@@ -181,6 +198,23 @@ export const typeDefs = gql`
   type AuthPayload {
     token: String!
     user: User!
+  }
+
+  #Bakong Payment
+
+  type BakongPayment {
+    _id: ID!
+    amount: Float!
+    currency: String
+    billNumber: String
+    khqrString: String
+    qrImage: String
+    status: String
+    reference: String
+    createdBy: User
+    paidAt: Date
+    createdAt: Date
+    updatedAt: Date
   }
 
   type PaginatorMeta {
@@ -267,6 +301,15 @@ export const typeDefs = gql`
     refunded
   }
 
+  enum TransferStatus {
+    pending
+    accepted
+    rejected
+    cancelled
+  }
+
+  # ========================================================INPUT TYPE========================================================
+
   input RegisterInput {
     image: String
     nameEn: String
@@ -344,28 +387,38 @@ export const typeDefs = gql`
     minStock: Int
   }
 
-input SaleInput {
-  items: [SaleItemInput]
-  user: ID
-  subtotal: Float
-  tax: Float
-  shopId: ID
-  discount: Float
-  total: Float
-  paymentMethod: PaymentMethod
-  amountPaid: Float
-  change: Float
-}
+  input CreateWarehouseTransferInput {
+    toShopId: ID
+    items: [TransferItemInput]
+    note: String
+  }
 
-input SaleItemInput {
-  product: ID
-  subProductId: ID
-  name: String
-  price: Float
-  quantity: Int
-  total: Float
-}
+  input TransferItemInput {
+    subProductId: ID
+    quantity: Int
+  }
 
+  input SaleInput {
+    items: [SaleItemInput]
+    user: ID
+    subtotal: Float
+    tax: Float
+    shopId: ID
+    discount: Float
+    total: Float
+    paymentMethod: PaymentMethod
+    amountPaid: Float
+    change: Float
+  }
+
+  input SaleItemInput {
+    product: ID
+    subProductId: ID
+    name: String
+    price: Float
+    quantity: Int
+    total: Float
+  }
 
   input UnitInput {
     nameKh: String
@@ -379,6 +432,12 @@ input SaleItemInput {
     nameEn: String
     remark: String
     active: Boolean
+  }
+
+  #Bakong payment input
+  input CreateBakongPaymentInput {
+    amount: Float!
+    billNumber: String!
   }
 
   type Query {
@@ -397,7 +456,9 @@ input SaleItemInput {
       pagination: Boolean
       keyword: String
     ): UnitPaginator
+
     getUnit: [Unit]
+
     #category
     getCategoryWithPagination(
       page: Int
@@ -405,9 +466,11 @@ input SaleItemInput {
       pagination: Boolean
       keyword: String
     ): UnitPaginator
+
     getCategory: [Category]
     # shop
     getAllShops(_id: ID!): [Shop]
+
     getShopByShopId(_id: ID, shopId: ID!): Shop
 
     #product
@@ -417,8 +480,11 @@ input SaleItemInput {
       pagination: Boolean
       keyword: String
     ): ProductPaginator
+
     getMainProducts(shopId: ID): [Product]
+
     getSubProducts(parentProductId: ID!): [SubProduct]
+
     getProductForSaleWithPagination(
       shopId: ID
       categoryId: String
@@ -428,14 +494,13 @@ input SaleItemInput {
       keyword: String
     ): SubProductPaginator
 
-    #warehouse
+    #warehouse adjust stocks
     getProductWareHouseWithPagination(
       page: Int
       limit: Int
       pagination: Boolean
       keyword: String
     ): WarehousePaginator
-     
 
     getProductWareHouseInShopoWithPagination(
       shopId: ID
@@ -443,7 +508,17 @@ input SaleItemInput {
       limit: Int
       pagination: Boolean
       keyword: String
-    ):WarehouseInShopPaginator
+    ): WarehouseInShopPaginator
+
+    getWarehouseTransfers(
+      status: TransferStatus
+      shopId: ID
+    ): [WarehouseTransfer]
+
+    getWarehouseTransferById(_id: ID!): WarehouseTransfer
+
+    #Bakong-Query
+    getBakongPayment(reference: String!): BakongPayment
   }
 
   type Mutation {
@@ -480,7 +555,7 @@ input SaleItemInput {
 
     #adjust stock
     adjustStock(input: AdjustStockInput!): MutationResponse
-    
+
     #sale
     createSale(input: SaleInput): MutationResponse
     refundSale(id: ID!): Sale!
@@ -496,5 +571,20 @@ input SaleItemInput {
     ): MutationResponse!
     updateSubProduct(_id: ID, input: SubProductInput): MutationResponse!
     deleteSubProduct(_id: ID!): MutationResponse!
+
+    # Product Transfer(Main warehouse -> shop)
+    createWarehouseTransfer(
+      input: CreateWarehouseTransferInput
+    ): MutationResponse
+
+    #Accept Transfer (Shop Side)
+    acceptWarehouseTransfer(transferId: ID!): MutationResponse!
+
+    #Reject / Cancel Transfer
+    rejectWarehouseTransfer(transferId: ID!, reason: String): MutationResponse!
+
+    #Bakong payment gatway
+    createBakongPayment(input: CreateBakongPaymentInput!): MutationResponse!
+    checkBakongPayment(reference: String!): MutationResponse!
   }
 `;

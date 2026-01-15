@@ -8,7 +8,6 @@ import { requireRole } from "./auth.js";
 export const userResolvers = {
   Query: {
     users: () => User.find(),
-    
     getUsersWithPagination: async (
       _,
       { page = 1, limit = 5, pagination = true, keyword = "", role = "" }
@@ -88,8 +87,9 @@ export const userResolvers = {
         return errorResponse();
       }
     },
-    
-    updateUserStatus: async (_, { _id, active }) => {
+
+    updateUserStatus: async (_, { _id, active },{ user }) => {
+      requireRole(user, ["admin", "superAdmin"]);
       try {
         const existingUser = await User.findById(_id);
         if (!existingUser) {

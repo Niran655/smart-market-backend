@@ -4,23 +4,17 @@ const userSchema = new mongoose.Schema({
   nameKh: String,
   nameEn: String,
   phone: String,
-  image:String,
-  gender:{ type: String, enum: ['male', 'female'] },
+  image: String,
+  gender: { type: String, enum: ["male", "female"] },
   email: { type: String, unique: true },
   password: String,
   role: {
     type: String,
     required: false,
-    enum: [
-      "superAdmin",
-      "admin",
-      "manager",
-      "cashier",
-      "stockController"
-    ],
+    enum: ["superAdmin", "admin", "manager", "cashier", "stockController"],
     default: "cashier",
   },
-  active: {type: Boolean, default: true},
+  active: { type: Boolean, default: true },
   createdAt: {
     type: Date,
     default: Date.now,

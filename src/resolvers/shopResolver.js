@@ -1,11 +1,13 @@
 import { errorResponse, successResponse } from "../utils/response.js";
 import Shop from "../models/Shop.js";
-import { requireRole } from "./auth.js";
+import { requireAuth, requireRole } from "./auth.js";
+import { useState } from "react";
 
 export const shopResolvers = {
   Query: {
-    getAllShops: async (_, { _id }) => {
-      const shops = await Shop.find({ user: _id })
+    getAllShops: async ( _,{_id},{ user }) => {
+      requireAuth(user)
+      const shops = await Shop.find({ user: user?._id })
         .populate({
           path: "user",
           select: "nameEn nameKh email role",
@@ -18,7 +20,7 @@ export const shopResolvers = {
 
       return shops;
     },
-    
+
     getShopByShopId: async (_, { _id, shopId }) => {
       try {
         const shop = await Shop.findOne({
@@ -74,7 +76,7 @@ export const shopResolvers = {
         return errorResponse();
       }
     },
-    
+
     addUserControllShop: async (_, { _id, userId }, { user }) => {
       requireRole(user, ["superAdmin", "admin"]);
       try {
@@ -108,7 +110,7 @@ export const shopResolvers = {
         };
       }
     },
-    
+
     deleteUserFromShop: async (_, { _id, userId }, { user }) => {
       requireRole(user, ["superAdmin"]);
       try {
@@ -162,7 +164,7 @@ export const shopResolvers = {
         return errorResponse();
       }
     },
-    
+
     deleteShop: async (_, { _id }) => {
       try {
         const existingShop = await Shop.findById(_id);

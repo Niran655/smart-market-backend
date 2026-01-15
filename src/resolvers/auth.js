@@ -2,7 +2,6 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { GraphQLError } from "graphql";
 
-import { errorResponse, successResponse } from "../utils/response.js";
 import User from "../models/User.js";
 
 export const requireAuth = (user) => {
