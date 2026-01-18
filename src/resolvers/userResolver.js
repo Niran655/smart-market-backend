@@ -3,15 +3,17 @@ import bcrypt from "bcryptjs";
 import paginateQuery from "../utils/paginateQuery.js";
 import { errorResponse, successResponse } from "../utils/response.js";
 import User from "../models/User.js";
-import { requireRole } from "./auth.js";
+import { requireAuth, requireRole } from "./auth.js";
 
 export const userResolvers = {
   Query: {
     users: () => User.find(),
     getUsersWithPagination: async (
       _,
-      { page = 1, limit = 5, pagination = true, keyword = "", role = "" }
+      { page = 1, limit = 5, pagination = true, keyword = "", role = "" },
+      { user }
     ) => {
+      requireAuth(user)
       try {
         const query = {
           ...(keyword && {
@@ -60,8 +62,9 @@ export const userResolvers = {
         return errorResponse();
       }
     },
-    
-    updateUser: async (_, { _id, input }) => {
+
+    updateUser: async (_, { _id, input }, { user }) => {
+      requireRole(user, ["superAdmin", "admin"])
       try {
         const existingUser = await User.findById(_id);
         if (!existingUser) {
@@ -88,7 +91,7 @@ export const userResolvers = {
       }
     },
 
-    updateUserStatus: async (_, { _id, active },{ user }) => {
+    updateUserStatus: async (_, { _id, active }, { user }) => {
       requireRole(user, ["admin", "superAdmin"]);
       try {
         const existingUser = await User.findById(_id);
@@ -109,7 +112,8 @@ export const userResolvers = {
       }
     },
 
-    deleteUser: async (_, { _id }) => {
+    deleteUser: async (_, { _id }, { user }) => {
+      requireRole(user, ["superAdmin", "admin"])
       try {
         const existingUser = await User.findById(_id);
         if (!existingUser) {

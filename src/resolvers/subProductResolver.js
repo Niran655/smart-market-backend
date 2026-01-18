@@ -132,6 +132,8 @@ export const subProductResolvers = {
         warehouse.stock = newStock;
         await warehouse.save();
 
+        
+
         const movement = await StockMovement.create({
           shop: sub.shopId,
           user: user?._id,

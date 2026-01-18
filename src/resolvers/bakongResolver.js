@@ -11,7 +11,7 @@
 //   Mutation: {
 //     createBakongPayment: async (_, { input }, { user }) => {
 //       const { amount, billNumber } = input;
-//       // 1️⃣ Call Bakong API to generate KHQR string
+//       //   Call Bakong API to generate KHQR string
 //       const token = process.env.BAKONG_TOKEN; // your token
 //       const bakongid = process.env.BAKONG_MERCHANT_ID;
 //       const response = await axios.post(
@@ -30,9 +30,9 @@
 //         }
 //       );
 //       const { khqrString, reference } = response.data;
-//       // 2️⃣ Generate QR image from string
+//       //   Generate QR image from string
 //       const qrImage = await QRCode.toDataURL(khqrString);
-//       // 3️⃣ Save to DB
+//       //   Save to DB
 //       const payment = await BakongPayment.create({
 //         amount,
 //         billNumber,
@@ -49,7 +49,7 @@
 //     },
 //     checkBakongPayment: async (_, { reference }) => {
 //       const token = process.env.BAKONG_TOKEN;
-//       // 1️⃣ Call Bakong API to check payment status
+//       //   Call Bakong API to check payment status
 //       const response = await axios.get(
 //         `https://sandbox.bakong.com.kh/api/khqr/check?reference=${reference}`,
 //         {
@@ -59,7 +59,7 @@
 //         }
 //       );
 //       const { paid } = response.data;
-//       // 2️⃣ Update DB
+//       //   Update DB
 //       const payment = await BakongPayment.findOne({ reference });
 //       if (!payment) throw new Error("Payment not found");
 //       if (paid) {

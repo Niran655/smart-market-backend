@@ -1,11 +1,11 @@
+// import { requireRole } from "../auth.js";
+import WarehouseInShop from "../models/WarehouseInShop.js";
 import StockMovement from "../models/StockMovement.js";
 import SubProduct from "../models/SubProduct.js";
 import Warehouse from "../models/Warehouse.js";
 import { errorResponse, successResponse } from "../utils/response.js";
 import Sale from "../models/Sale.js";
-// import { requireRole } from "../auth.js";
 
- 
 const generateSaleNumber = () => {
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   const rand = Math.floor(10000 + Math.random() * 90000);
@@ -42,39 +42,35 @@ export const saleResolvers = {
             return errorResponse("SubProduct not found");
           }
 
-          let previousStock = subProduct.stock;
-          let newStock = subProduct.stock;
+          //  SHOP STOCK ONLY
+          const warehouseInShop = await WarehouseInShop.findOne({
+            shop: input.shopId,
+            subProduct: subProduct._id,
+          });
 
-          if (subProduct.check === true) {
-            const warehouse = await Warehouse.findOne({
-              subProduct: subProduct._id,
-            });
-
-            if (!warehouse) {
-              return errorResponse(
-                `Warehouse record missing for subProduct ${subProduct._id}`
-              );
-            }
-
-            newStock = previousStock - item.quantity;
-
-            if (newStock < 0) {
-              return {
-                isSuccess: false,
-                message: {
-                  messageEn: "Not enough stock",
-                  messageKh: "មិនមានស្តុកគ្រប់គ្រាន់",
-                },
-              }
-            }
-
-            subProduct.stock = newStock;
-            await subProduct.save();
-
-            warehouse.stock = newStock;
-            await warehouse.save();
+          if (!warehouseInShop) {
+            return errorResponse("Stock not found in this shop");
           }
 
+          const previousStock = warehouseInShop.stock || 0;
+          const newStock = previousStock - item.quantity;
+
+          if (newStock < 0) {
+            return {
+              isSuccess: false,
+              message: {
+                messageEn: "Not enough stock in shop",
+                messageKh: "ស្តុកនៅហាងមិនគ្រប់គ្រាន់",
+              },
+            };
+          }
+
+          //  Update shop stock
+          warehouseInShop.stock = newStock;
+          warehouseInShop.updatedAt = new Date();
+          await warehouseInShop.save();
+
+          //  Stock movement (shop-based)
           await StockMovement.create({
             shop: input.shopId,
             user: userId,

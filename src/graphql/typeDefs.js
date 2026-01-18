@@ -163,6 +163,15 @@ export const typeDefs = gql`
     amountPaid: Float
     change: Float
     status: SaleStatus
+
+    # currency: Currency!        # Sale currency (USD / KHR)
+    # exchangeRate: Float        # USD → KHR (optional)
+
+    # receivedAmount: Float      #  money customer gives
+    # receivedCurrency: Currency #  USD / KHR
+    # changeAmount: Float        #  change returned
+    # changeCurrency: Currency   #  USD / KHR
+
     createdAt: Date
   }
 
@@ -260,6 +269,11 @@ export const typeDefs = gql`
     paginator: PaginatorMeta
   }
 
+  type ProductWarehouseTransfer {
+    data:[WarehouseTransfer]
+    paginator: PaginatorMeta
+  }
+
   type Message {
     messageEn: String
     messageKh: String
@@ -307,6 +321,12 @@ export const typeDefs = gql`
     rejected
     cancelled
   }
+
+  enum Currency {
+  USD
+  KHR
+}
+
 
   # ========================================================INPUT TYPE========================================================
 
@@ -388,8 +408,8 @@ export const typeDefs = gql`
   }
 
   input CreateWarehouseTransferInput {
-    toShopId: ID
-    items: [TransferItemInput]
+    toShopIds: [ID]!
+    items: [TransferItemInput]!
     note: String
   }
 
@@ -409,6 +429,13 @@ export const typeDefs = gql`
     paymentMethod: PaymentMethod
     amountPaid: Float
     change: Float
+
+    # receivedAmount: Float!     #  INPUT money from customer
+    # receivedCurrency: Currency!#  INPUT currency
+    # changeAmount: Float        # calculated
+    # changeCurrency: Currency   # calculated
+
+
   }
 
   input SaleItemInput {
@@ -458,7 +485,7 @@ export const typeDefs = gql`
     ): UnitPaginator
 
     getUnit: [Unit]
-
+    
     #category
     getCategoryWithPagination(
       page: Int
@@ -510,10 +537,14 @@ export const typeDefs = gql`
       keyword: String
     ): WarehouseInShopPaginator
 
-    getWarehouseTransfers(
+    getWarehouseTransfersWithPagination(
       status: TransferStatus
       shopId: ID
-    ): [WarehouseTransfer]
+      page: Int
+      limit: Int
+      pagination: Boolean
+      keyword: String
+    ): ProductWarehouseTransfer
 
     getWarehouseTransferById(_id: ID!): WarehouseTransfer
 
