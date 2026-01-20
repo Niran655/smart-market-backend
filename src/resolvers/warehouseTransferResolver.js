@@ -1,12 +1,10 @@
-
-
-import Warehouse from "../models/Warehouse.js";
 import WarehouseTransfer from "../models/WarehouseTransfer.js";
-import StockMovement from "../models/StockMovement.js";
 import WarehouseInShop from "../models/WarehouseInShop.js";
-import SubProduct from "../models/SubProduct.js";
-import { errorResponse, successResponse } from "../utils/response.js";
+import StockMovement from "../models/StockMovement.js";
 import paginateQuery from "../utils/paginateQuery.js";
+import SubProduct from "../models/SubProduct.js";
+import Warehouse from "../models/Warehouse.js";
+import { errorResponse, successResponse } from "../utils/response.js";
 
 const requireAuth = (user) => {
     if (!user) throw new Error("Authentication required");
@@ -19,7 +17,12 @@ export const warehouseTransferResolver = {
             try {
                 const query = {
                     ...(status ? { status } : {}),
-                    ...(shopId ? { toShop: shopId } : {})
+                    ...(shopId ? { toShop: shopId } : {}),
+                    ...(keyword ? {
+                        $or: [
+                            { note: { $regex: keyword, $options: "i" } },
+                        ],
+                    } : {}),
                 }
 
                 const paginationQuery = await paginateQuery({
@@ -196,11 +199,9 @@ export const warehouseTransferResolver = {
                     return errorResponse("Transfer already processed", "ការផ្ទេរបានដំណើរការហើយ");
                 }
 
-
                 for (const item of transfer.items) {
                     const wh = await Warehouse.findOne({ subProduct: item.subProduct });
                     if (!wh) {
-
                         continue;
                     }
                     const previousStock = wh.stock;

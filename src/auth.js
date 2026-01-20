@@ -23,7 +23,7 @@ export async function buildContext({ req }) {
     if (!token) return { user: null };
 
     const payload = jwt.verify(token, JWT_SECRET);
-    console.log("JWT payload:", payload);
+    // console.log("JWT payload:", payload);
     const userId = payload?.userId || payload?.user?.id;
     if (!userId) return { user: null };
 
