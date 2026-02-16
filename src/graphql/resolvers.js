@@ -1020,7 +1020,7 @@
 //         }
 
 //         if (!input?.items || input.items.length === 0) {
-//           return errorResponse("Sale items are required");
+//           return errorResponse("Sale items are requiared");
 //         }
 
 //         const saleNumber = generateSaleNumber();

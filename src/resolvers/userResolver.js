@@ -13,19 +13,23 @@ export const userResolvers = {
       { page = 1, limit = 5, pagination = true, keyword = "", role = "" },
       { user }
     ) => {
-      requireAuth(user)
+      requireAuth(user);
       try {
         const query = {
-          ...(keyword && {
-            $or: [
-              { nameEn: { $regex: keyword, $options: "i" } },
-              { nameKh: { $regex: keyword, $options: "i" } },
-            ],
+          // ...(keyword && {
+          //   $or: [
+          //     { nameEn: { $regex: keyword, $options: "i" } },
+          //     { nameKh: { $regex: keyword, $options: "i" } },
+          //   ],
+          // }),
+            ...(keyword && {
+            $text: { $search: keyword }
           }),
         };
+
         if (role) {
           query.role = role;
-        }
+        };
 
         const paginationQuery = await paginateQuery({
           model: User,
@@ -33,6 +37,9 @@ export const userResolvers = {
           page,
           limit,
           pagination,
+          // sort: keyword ? { score: { $meta: "textScore" } } : { createdAt: -1 },
+          // select: keyword ? { score: { $meta: "textScore" } } : "",
+
         });
 
         return {

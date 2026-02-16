@@ -1,11 +1,12 @@
 import paginateQuery from "../utils/paginateQuery.js";
 import { errorResponse, successResponse } from "../utils/response.js";
 import Unit from "../models/Unit.js";
-import { requireRole } from "./auth.js";
+import { requireAuth, requireRole } from "./auth.js";
 
 export const unitResolvers = {
   Query: {
     getUnit: async (_, { user }) => {
+      requireAuth(user)
       try {
         const units = await Unit.find();
         return units;
@@ -20,6 +21,7 @@ export const unitResolvers = {
       { page = 1, limit = 5, pagination = true, keyword = "" },
       { user }
     ) => {
+      requireAuth(user);
       try {
         const query = {
           ...(keyword && {
@@ -51,7 +53,6 @@ export const unitResolvers = {
   Mutation: {
     createUnit: async (_, { input }, { user }) => {
       requireRole(user, ["admin", "superAdmin"]);
-
       try {
         const existingUnit = await Unit.findOne({
           $or: [{ nameKh: input.nameEn }, { nameEn: input.nameEn }],
@@ -76,7 +77,8 @@ export const unitResolvers = {
       }
     },
     
-    updateUnit: async (_, { _id, input }) => {
+    updateUnit: async (_, { _id, input },{user}) => {
+      requireRole(user, ["admin", "superAdmin"]);
       try {
         const existingUnit = await Unit.findById(_id);
         if (!existingUnit) {
@@ -96,7 +98,8 @@ export const unitResolvers = {
       }
     },
     
-    updateUnitStatus: async (_, { _id, active }) => {
+    updateUnitStatus: async (_, { _id, active },{user}) => {
+      requireRole(user, ["admin", "superAdmin"]);
       try {
         const existingUnit = await Unit.findById(_id);
         if (!existingUnit) {
@@ -116,7 +119,8 @@ export const unitResolvers = {
       }
     },
     
-    deleteUnit: async (_, { _id }) => {
+    deleteUnit: async (_, { _id },{user}) => {
+      requireRole(user, ["admin", "superAdmin"]);
       try {
         const existingUnit = await Unit.findById(_id);
         if (!existingUnit) {

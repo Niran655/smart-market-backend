@@ -50,12 +50,11 @@ export const authResolvers = {
 
       const token = jwt.sign(
         { userId: user.id },
-        process.env.JWT_SECRET || "Ni0sddfsd325sfweewfer432sdfg_0089@IT",
+        process.env.JWT_SECRET,
         {
           expiresIn: "24h",
         }
       );
-      
       return {
         token,
         user,

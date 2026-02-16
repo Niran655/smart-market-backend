@@ -12,6 +12,7 @@ import { userResolvers } from "./userResolver.js";
 import { authResolvers } from "./auth.js";
 import { warehouseTransferResolver } from "./warehouseTransferResolver.js";
 import { warehouseInshopResolver } from "./warehouseInShopResolver.js";
+import { dashboardStatsResolver } from "./dashboardStatsResolver.js";
 
 // Merge all resolvers
 export const resolvers = mergeResolvers([
@@ -26,5 +27,6 @@ export const resolvers = mergeResolvers([
   saleResolvers,
   bakongResolvers,
   warehouseTransferResolver,
-  warehouseInshopResolver
+  warehouseInshopResolver,
+  dashboardStatsResolver
 ]);

@@ -11,6 +11,18 @@ const TransferItemSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+
+  receivedQty: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+
+  remainingQty: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
 });
 
 const WarehouseTransferSchema = new mongoose.Schema(
@@ -27,7 +39,7 @@ const WarehouseTransferSchema = new mongoose.Schema(
     items: [TransferItemSchema],
     status: {
       type: String,
-      enum: ["pending", "accepted", "rejected", "cancelled"],
+      enum: ["pending", "accepted", "rejected","partial_accepted", "cancelled"],
       default: "pending",
     },
     requestedBy: {
@@ -41,7 +53,7 @@ const WarehouseTransferSchema = new mongoose.Schema(
     note: String,
     acceptedAt: Date,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export default mongoose.model("WarehouseTransfer", WarehouseTransferSchema);
