@@ -6,7 +6,7 @@ import { requireAuth, requireRole } from "./auth.js";
 export const unitResolvers = {
   Query: {
     getUnit: async (_, { user }) => {
-      requireAuth(user)
+      requireAuth(user);
       try {
         const units = await Unit.find();
         return units;
@@ -21,7 +21,7 @@ export const unitResolvers = {
       { page = 1, limit = 5, pagination = true, keyword = "" },
       { user }
     ) => {
-      requireAuth(user);
+      requireAuth(user);   
       try {
         const query = {
           ...(keyword && {

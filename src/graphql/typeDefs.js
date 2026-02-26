@@ -752,6 +752,28 @@ export const typeDefs = gql`
     updatedAt: Date
   }
 
+  type PurchaseOrder {
+    _id: ID!
+    supplier: Supplier
+    items: [PurchaseOrderItem]
+    totalAmount: Float
+    status: PurchaseOrderStatus
+    remark: String
+    createdBy: User
+    receivedBy: User
+    createdAt: Date
+    receivedAt: Date
+  }
+
+  type PurchaseOrderItem {
+    subProduct: SubProduct
+    quantity: Int
+    costPrice: Float
+    totalPrice: Float
+    receivedQty: Int
+    remainingQty: Int
+  }
+
   input AdjustStockInput {
     subProductId: ID!
     quantity: Int!
@@ -842,6 +864,15 @@ export const typeDefs = gql`
     createdAt: Date!
     updatedAt: Date!
   }
+
+  type Supplier{
+    _id: ID!
+    nameKh:String
+    nameEn:String
+    remark:String
+    createdAt: Date
+    updatedAt: Date
+  }
 # ========================================DASHBOARD STAT==================
     type TopItem {
       rank: Int
@@ -867,14 +898,15 @@ export const typeDefs = gql`
       reservations: Int
       
       dailyRevenue:[Float]
-      weeklyRevenue: [Float]        # Revenue per day (Mon-Sun)
-      topSellingItems: [TopItem]    # Top selling products
-      activeOrders: [ActiveOrder]   # Current active orders
-      categoryStats: [CategoryStat] # Orders per category
+      weeklyRevenue: [Float]  
+      topSellingItems: [TopItem]    
+      activeOrders: [ActiveOrder]    
+      categoryStats: [CategoryStat]  
     }
 
 # ========================================DASHBOARD STAT====================
 # ======================================== REPORT TYPES ====================
+
 enum ReportType {
   SALES
   STAFF
@@ -919,6 +951,7 @@ type StaffReport {
   totalStaff: Int
   activeStaff: Int
   totalHours: Int
+  totalSales: Float
   salesPerStaff: Float
   performance: [StaffPerformance]
 }
@@ -945,6 +978,7 @@ type Report {
   staff: StaffReport
   inventory: InventoryReport
 }
+
 # ======================================== REPORT TYPES ====================
   type AuthPayload {
     token: String!
@@ -991,6 +1025,11 @@ type Report {
     paginator: PaginatorMeta
   }
 
+  type SupplierPaginator {
+    data: [Supplier]
+    paginator: PaginatorMeta
+  }
+
   type ProductPaginator {
     data: [Product]
     paginator: PaginatorMeta
@@ -1021,6 +1060,11 @@ type Report {
     data: [WarehouseTransfer]
     paginator: PaginatorMeta
   }
+
+  type PurchaseOrderPaginator {
+  data: [PurchaseOrder]
+  paginator: PaginatorMeta
+}
 
   type Message {
     messageEn: String
@@ -1069,6 +1113,13 @@ type Report {
     accepted
     rejected
     cancelled
+  }
+
+  enum PurchaseOrderStatus {
+  pending
+  partial_received
+  received
+  cancelled
   }
 
   enum Currency {
@@ -1207,12 +1258,41 @@ type Report {
     remark: String
     active: Boolean
   }
+  input SupplierInput{
+    nameKh:String
+    nameEn:String
+    remark:String
+  }
+
+  input CreatePurchaseOrderInput  {
+    supplierId: ID
+    items: [PurchaseOrderItemInput]
+    remark: String
+  }
+
+  input PurchaseOrderItemInput {
+    subProductId: ID
+    quantity: Int
+    costPrice: Float
+  }
+
+  input UpdatePurchaseOrderInput {
+    supplierId: ID
+    items: [PurchaseOrderItemInput!]
+    remark: String
+  }
+
+  input AcceptPurchaseOrderItemInput {
+  subProductId: ID!
+  receivedQty: Int!
+}
 
   input PaymentInput {
     method: String
     amountPaid: Float
     change: Float
   }
+
 
   #Bakong payment input
   input CreateBakongPaymentInput {
@@ -1274,6 +1354,26 @@ type Report {
       keyword: String
     ): SubProductPaginator
 
+    #supplier
+    getSuppliersWithPagination(
+      page: Int
+      limit: Int
+      pagination: Boolean
+      keyword: String
+    ): SupplierPaginator
+
+    #purchase order
+    getPurchaseOrdersWithPagination(
+      supplierId: ID
+      status: PurchaseOrderStatus
+      page: Int
+      limit: Int
+      pagination: Boolean
+      keyword: String
+    ): PurchaseOrderPaginator
+
+    getPurchaseOrderById(_id: ID!): PurchaseOrder
+
     #warehouse adjust stocks
     getProductWareHouseWithPagination(
       page: Int
@@ -1323,11 +1423,12 @@ type Report {
       dayStart: Date       
       dayEnd: Date      
     ): DashboardStats
+    
     getReportStats(
+      shopId: ID
       type: ReportType
       startDate: Date
       endDate: Date
-      search: String
     ): Report
 
   }
@@ -1368,6 +1469,11 @@ type Report {
     deleteProduct(_id: ID!): MutationResponse!
     updateProductStatus(_id: ID!, active: Boolean!): MutationResponse!
 
+    #supplier
+    createSupplier(input: SupplierInput): MutationResponse!
+    updateSupplier(_id: ID!, input: SupplierInput): MutationResponse!
+    deleteSupplier(_id: ID!): MutationResponse!
+
     #adjust stock
     adjustStock(input: AdjustStockInput!): MutationResponse
 
@@ -1391,6 +1497,26 @@ type Report {
     # Product Transfer(Main warehouse -> shop)
     createWarehouseTransfer(
       input: CreateWarehouseTransferInput
+    ): MutationResponse
+
+    createPurchaseOrder(
+      input: CreatePurchaseOrderInput
+    ): MutationResponse
+
+    updatePurchaseOrder(
+      _id: ID!
+      input: UpdatePurchaseOrderInput!
+    ): MutationResponse!
+
+    cancelPurchaseOrder(
+      _id: ID!
+      reason: String
+    ): MutationResponse!
+    
+
+    receivePurchaseOrder(
+      purchaseOrderId: ID
+      items: [AcceptPurchaseOrderItemInput]
     ): MutationResponse
 
     #Accept Transfer (Shop Side)

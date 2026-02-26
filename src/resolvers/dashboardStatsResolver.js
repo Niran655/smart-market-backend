@@ -7,9 +7,8 @@ export const dashboardStatsResolver = {
   Query: {
     dashboardStats: async (_, { shopId, filter, dayStart, dayEnd }, { user }) => {
       try {
-  
-        // requireRole(user, ["superAdmin", "admin"]);
 
+        requireRole(user, ["superAdmin", "admin"]);
         // -------------------- DATE FILTER --------------------
         let startDate, endDate;
         const today = new Date();
@@ -84,14 +83,14 @@ export const dashboardStatsResolver = {
         // -------------------- AVERAGE VALUE --------------------
         const averageValue = totalOrders ? totalSales / totalOrders : 0;
 
-        // -------------------- RESERVATIONS (pending orders) --------------------
+        // -------------------- RESERVATIONS --------------------
         const reservations = await Sale.countDocuments({
           ...shopFilter,
           status: "pending",
           ...dateFilter,
         });
 
-        // -------------------- DAILY REVENUE (for the entire period) --------------------
+        // -------------------- DAILY REVENUE--------------------
         let dailyRevenue = [];
         if (startDate && endDate) {
           const dailyRevenues = await Sale.aggregate([

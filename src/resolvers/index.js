@@ -13,6 +13,9 @@ import { authResolvers } from "./auth.js";
 import { warehouseTransferResolver } from "./warehouseTransferResolver.js";
 import { warehouseInshopResolver } from "./warehouseInShopResolver.js";
 import { dashboardStatsResolver } from "./dashboardStatsResolver.js";
+import { reportResolver } from "./reportResolver.js";
+import { supplierResolvers } from "./supplierResolver.js";
+import { purchaseOrderResolver } from "./purchaseOrderResolver.js";
 
 // Merge all resolvers
 export const resolvers = mergeResolvers([
@@ -28,5 +31,8 @@ export const resolvers = mergeResolvers([
   bakongResolvers,
   warehouseTransferResolver,
   warehouseInshopResolver,
-  dashboardStatsResolver
+  dashboardStatsResolver,
+  reportResolver,
+  supplierResolvers,
+  purchaseOrderResolver
 ]);
