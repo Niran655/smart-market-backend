@@ -5,8 +5,8 @@ import { requireAuth, requireRole } from "./auth.js";
 
 export const unitResolvers = {
   Query: {
-    getUnit: async (_, { user }) => {
-      requireAuth(user);
+    getUnit: async (_, {user}) => {
+      // requireAuth(user);
       try {
         const units = await Unit.find();
         return units;

@@ -1,10 +1,29 @@
+// import { ApolloServer } from "apollo-server";
+// import dotenv from "dotenv";
+// import { typeDefs } from "./graphql/typeDefs.js";
+// import { connectDB } from "./config/database.js";
+// import { resolvers } from "./resolvers/index.js";
+// import { buildContext } from "./auth.js"; 
+// dotenv.config();
+// connectDB();
+// const server = new ApolloServer({
+//   typeDefs,
+//   resolvers,
+//   context: async ({ req }) => {
+//     const context = await buildContext({ req });
+//     return context;
+//   },
+// });
+// server.listen({ port: 5000 }).then(({ url }) => {
+//   console.log(`🚀 Server running at ${url}`);
+// });
 import { ApolloServer } from "apollo-server";
 import dotenv from "dotenv";
-
+import depthLimit from "graphql-depth-limit";
 import { typeDefs } from "./graphql/typeDefs.js";
 import { connectDB } from "./config/database.js";
 import { resolvers } from "./resolvers/index.js";
-import { buildContext } from "./auth.js"; 
+import { buildContext } from "./auth.js";
 
 dotenv.config();
 connectDB();
@@ -12,14 +31,23 @@ connectDB();
 const server = new ApolloServer({
   typeDefs,
   resolvers,
-  context: async ({ req }) => {
-    const context = await buildContext({ req });
-    return context;
-  },
+  // introspection: false,
+  validationRules: [depthLimit(5)],
+  context: async ({ req }) => buildContext({ req }),
 });
-server.listen({ port: 5000 }).then(({ url }) => {
-  console.log(`🚀 Server running at ${url}`);
+
+server.listen({ port: 4000 }).then(({ url }) => {
+  console.log(`🚀 GraphQL Server ready at ${url}`);
 });
+
+
+// server.listen({
+//   port: 4000,
+//   host: "0.0.0.0",
+// }).then(({ url }) => {
+//   console.log(`🚀 Server running at ${url}`);
+// });
+
 
 // import express from "express";
 // import http from "http";

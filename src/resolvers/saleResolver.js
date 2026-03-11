@@ -109,7 +109,7 @@ export const saleResolvers = {
   Mutation: {
     createSale: async (_, { input }, { user }) => {
       try {
-        console.log("Creating sale with input:", JSON.stringify(input, null, 2));
+        // console.log("Creating sale with input:", JSON.stringify(input, null, 2));
 
         if (!input?.shopId) {
           return {

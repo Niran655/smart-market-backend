@@ -14,6 +14,7 @@ export const userResolvers = {
       { user }
     ) => {
       requireAuth(user);
+      // requireRole(user, ["admin", "superAdmin"]);
       try {
         const query = {
           // ...(keyword && {
@@ -22,7 +23,7 @@ export const userResolvers = {
           //     { nameKh: { $regex: keyword, $options: "i" } },
           //   ],
           // }),
-            ...(keyword && {
+          ...(keyword && {
             $text: { $search: keyword }
           }),
         };
@@ -50,6 +51,19 @@ export const userResolvers = {
         console.log("Error", error);
       }
     },
+    getProfileById: async (_, { _id }, { user }) => {
+      requireAuth(user);
+      try {
+        const profile = await User.findById({_id:user?._id});
+        if (!profile) {
+          throw new Error("Profile not found");
+        }
+        return profile;
+      } catch (error) {
+        console.error("Error", error);
+        throw new Error("Failed to Fetch")
+      }
+    }
   },
 
   Mutation: {

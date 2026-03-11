@@ -1309,6 +1309,8 @@ type Report {
       keyword: String
       role: String
     ): UserPaginator
+
+    getProfileById(_id:ID):User
     # unit
     getUnitWithPagination(
       page: Int

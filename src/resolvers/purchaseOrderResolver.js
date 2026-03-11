@@ -63,7 +63,14 @@ export const purchaseOrderResolver = {
 
                 // ❌ Do NOT allow update if already received
                 if (["received", "partial_received"].includes(po.status)) {
-                    throw new Error("Cannot update received purchase order");
+                    // throw new Error("Cannot update received purchase order");
+                    return{
+                         isSuccess: false,
+                    message: {
+                        messageEn: "Cannot update received purchase order",
+                        messageKh: "មិនអាចកែប្រែការបញ្ជាទិញដែលបានទទួលរួចទេ",
+                    },
+                    }
                 }
 
                 const { supplierId, items, remark } = input;
@@ -71,7 +78,7 @@ export const purchaseOrderResolver = {
                 if (supplierId) po.supplier = supplierId;
                 if (remark !== undefined) po.remark = remark;
 
-                // ================= UPDATE ITEMS =================
+                
                 if (items && items.length > 0) {
                     let totalAmount = 0;
 
@@ -113,15 +120,21 @@ export const purchaseOrderResolver = {
             }
         },
 
-        // ================= CANCEL PURCHASE ORDER =================
+        
         cancelPurchaseOrder: async (_, { _id, reason }, { user }) => {
             try {
                 const po = await PurchaseOrder.findById(_id);
                 if (!po) throw new Error("Purchase order not found");
 
-                // ❌ Do NOT allow cancel if already received
+       
                 if (po.status === "received") {
-                    throw new Error("Cannot cancel a received purchase order");
+                    return {
+                        isSuccess: false,
+                        message: {
+                            messageEn: "Cannot cancel a received purchase order",
+                            messageKh: "មិនអាចលុបបញ្ជាទិញដែលបានទទួលរួចទេ",
+                        },
+                    };
                 }
 
                 po.status = "cancelled";
