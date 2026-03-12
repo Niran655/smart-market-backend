@@ -54,7 +54,8 @@ export const userResolvers = {
     getProfileById: async (_, { _id }, { user }) => {
       requireAuth(user);
       try {
-        const profile = await User.findById({_id:user?._id});
+        const idToUse = _id || user?._id;
+        const profile = await User.findById(idToUse);
         if (!profile) {
           throw new Error("Profile not found");
         }
